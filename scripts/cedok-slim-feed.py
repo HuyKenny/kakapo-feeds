@@ -38,7 +38,7 @@ ENV_FILE = os.environ.get("KAKAPO_ENV_FILE", "/home/kenny/ai/credentials/.kakapo
 OUT_DEFAULT = "/tmp/cedok-slim.xml"  # tmpfs na Malině (~100 MB)
 LM_FILE = "sDovolena_last_minute_cedok_cs.xml"  # SFTP, obnova několikrát denně
 MAIN_FILE_ENV = "CEDOK_SFTP_FILE"
-FAR_CACHE = "/home/kenny/.cache/kakapo/cedok-far.json"  # vzdálené termíny pro rychlé běhy
+FAR_CACHE = os.path.expanduser("~/.cache/kakapo/cedok-far.json")  # vzdálené termíny pro rychlé běhy
 REMOTE_PATH = "/feeds/cedok-slim.xml"  # relativně k WP rootu (FTP root)
 FEED_URL = "https://kakapo.cz/feeds/cedok-slim.xml"
 
