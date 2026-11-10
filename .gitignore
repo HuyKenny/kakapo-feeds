@@ -1,0 +1,6 @@
+# public repo: never commit keys or generated feeds
+.env*
+*credentials*
+*.xml
+*.xml.gz
+__pycache__/

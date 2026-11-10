@@ -1,0 +1,65 @@
+name: feeds
+# Nightly slim feeds for kakapo.cz: stream the big supplier XML, keep the cheapest future
+# offers per hotel and upload the slim file to the kakapo import Worker (R2 inbox).
+# Moved from the Raspberry Pi cron on 10 Nov 2026.
+# PUBLIC repo: logs are public. Scripts print only counts and HTTP statuses; all
+# endpoints and keys come from secrets (masked by GitHub).
+on:
+  schedule:
+    - cron: "10 1 * * *"   # ATIS  02:10 CET
+    - cron: "30 1 * * *"   # Čedok 02:30 CET (full 3.8 GB SFTP stream, ~40+ min on a runner)
+  workflow_dispatch:
+    inputs:
+      feed:
+        description: "atis | cedok"
+        required: true
+        default: atis
+      upload:
+        description: "upload to the import Worker (off = generate only)"
+        type: boolean
+        default: true
+concurrency:
+  group: feeds-${{ github.event.inputs.feed || github.event.schedule }}
+  cancel-in-progress: false
+permissions:
+  contents: read
+jobs:
+  feed:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+      - name: Which feed
+        id: f
+        run: |
+          case "${{ github.event.inputs.feed || github.event.schedule }}" in
+            "10 1 * * *") f=atis ;;
+            "30 1 * * *") f=cedok ;;
+            *) f="${{ github.event.inputs.feed }}" ;;
+          esac
+          up="${{ github.event_name == 'schedule' || inputs.upload }}"
+          [ "$up" = true ] && echo "args=" >> "$GITHUB_OUTPUT" || echo "args=--no-upload" >> "$GITHUB_OUTPUT"
+          echo "feed=$f" >> "$GITHUB_OUTPUT"
+      - name: Secret check
+        run: python3 scripts/verify_no_secrets.py --repo
+        env:
+          CEDOK_SFTP_PASS: ${{ secrets.CEDOK_SFTP_PASS }}
+          ATIS_FEED_URL: ${{ secrets.ATIS_FEED_URL }}
+          KAKAPO_IMPORT_SECRET: ${{ secrets.KAKAPO_IMPORT_SECRET }}
+      - name: ATIS slim feed
+        if: steps.f.outputs.feed == 'atis'
+        run: python3 scripts/atis-slim-feed.py ${{ steps.f.outputs.args }}
+        env:
+          ATIS_FEED_URL: ${{ secrets.ATIS_FEED_URL }}
+          KAKAPO_IMPORT_URL: ${{ secrets.KAKAPO_IMPORT_URL }}
+          KAKAPO_IMPORT_SECRET: ${{ secrets.KAKAPO_IMPORT_SECRET }}
+      - name: Čedok slim feed
+        if: steps.f.outputs.feed == 'cedok'
+        run: python3 scripts/cedok-slim-feed.py --target r2 ${{ steps.f.outputs.args }}
+        env:
+          CEDOK_SFTP_HOST: ${{ secrets.CEDOK_SFTP_HOST }}
+          CEDOK_SFTP_USER: ${{ secrets.CEDOK_SFTP_USER }}
+          CEDOK_SFTP_PASS: ${{ secrets.CEDOK_SFTP_PASS }}
+          CEDOK_SFTP_FILE: ${{ secrets.CEDOK_SFTP_FILE }}
+          KAKAPO_IMPORT_URL: ${{ secrets.KAKAPO_IMPORT_URL }}
+          KAKAPO_IMPORT_SECRET: ${{ secrets.KAKAPO_IMPORT_SECRET }}
